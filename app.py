@@ -327,7 +327,6 @@ with right:
         st.info("좌측에서 이미지를 업로드하면, 추천 결과와 미리보기가 생성됩니다.")
     else:
         base_img = _safe_open_image(uploaded)
-        st.image(base_img, caption="업로드된 원본 이미지", use_column_width=True)
 
     if run_btn:
         if not uploaded:
@@ -337,8 +336,8 @@ with right:
         # 1) AI 분석(현재는 더미)
         brief = analyze_brief_dummy(headline=headline, subcopy=subcopy, intent=intent)
 
-        # 2) 폰트 추천
-        top = rank_fonts(fonts, brief, topk=3)
+        # 2) 폰트 추천 (TOP 2개만 사용 - 6개 미리보기용)
+        top = rank_fonts(fonts, brief, topk=2)
 
         # 3) 결과 출력
         c1, c2 = st.columns([1, 1], gap="large")
@@ -347,64 +346,61 @@ with right:
             st.subheader("AI 해석 브리프(구조화 결과)")
             st.json(brief)
 
-            st.subheader("추천 폰트 TOP 3")
+            st.subheader("추천 폰트 TOP 2")
             for i, (fm, sc) in enumerate(top, start=1):
                 st.markdown(f"**{i}. {fm.name}**  \n- score: `{sc:.1f}`  \n- tags: `{', '.join(fm.tags)}`  \n- license: `{fm.license}`")
 
         with c2:
-            st.subheader("미리보기 시안 (폰트별 3가지 레이아웃)")
+            # 디바이스 타입 필터
+            device_filter = st.radio(
+                "디바이스 선택",
+                ["PC", "MO"],
+                horizontal=True,
+                key="device_filter"
+            )
+            device_type = device_filter.lower()
+            
+            st.subheader(f"미리보기 시안 ({device_filter} 버전 - 6개)")
+            
+            # TOP 2 폰트 × 3 레이아웃 = 6개
+            preview_list = []
             for fm, sc in top:
-                st.markdown(f"**{fm.name}**")
-                
-                # PC 버전
-                st.markdown("##### PC 버전")
-                prev_cols_pc = st.columns(3)
-                for idx, layout in enumerate(["A", "B", "C"]):
-                    preview_pc = generate_preview(
+                for layout in ["A", "B", "C"]:
+                    preview = generate_preview(
                         base_img=base_img,
                         font_meta=fm,
                         headline=headline,
                         subcopy=subcopy,
                         layout=layout,
-                        device_type="pc",
+                        device_type=device_type,
                     )
-                    png_bytes_pc = img_to_bytes_png(preview_pc)
-                    with prev_cols_pc[idx]:
-                        st.image(preview_pc, use_column_width=True)
-                        st.download_button(
-                            label=f"다운로드 ({fm.id}-{layout}-PC.png)",
-                            data=png_bytes_pc,
-                            file_name=f"{fm.id}-{layout}-PC.png",
-                            mime="image/png",
-                            use_container_width=True,
-                            key=f"dl-pc-{fm.id}-{layout}",
-                        )
-                
-                # MO 버전
-                st.markdown("##### MO 버전")
-                prev_cols_mo = st.columns(3)
-                for idx, layout in enumerate(["A", "B", "C"]):
-                    preview_mo = generate_preview(
-                        base_img=base_img,
-                        font_meta=fm,
-                        headline=headline,
-                        subcopy=subcopy,
-                        layout=layout,
-                        device_type="mo",
-                    )
-                    png_bytes_mo = img_to_bytes_png(preview_mo)
-                    with prev_cols_mo[idx]:
-                        st.image(preview_mo, use_column_width=True)
-                        st.download_button(
-                            label=f"다운로드 ({fm.id}-{layout}-MO.png)",
-                            data=png_bytes_mo,
-                            file_name=f"{fm.id}-{layout}-MO.png",
-                            mime="image/png",
-                            use_container_width=True,
-                            key=f"dl-mo-{fm.id}-{layout}",
-                        )
-                
-                st.divider()
+                    preview_list.append({
+                        "preview": preview,
+                        "font_name": fm.name,
+                        "font_id": fm.id,
+                        "layout": layout,
+                        "device": device_type
+                    })
+            
+            # 6개를 2행 3열로 표시
+            for row in range(2):
+                cols = st.columns(3)
+                for col_idx in range(3):
+                    idx = row * 3 + col_idx
+                    if idx < len(preview_list):
+                        item = preview_list[idx]
+                        with cols[col_idx]:
+                            st.image(item["preview"], use_column_width=True)
+                            st.caption(f"{item['font_name']} - Layout {item['layout']}")
+                            png_bytes = img_to_bytes_png(item["preview"])
+                            st.download_button(
+                                label=f"다운로드",
+                                data=png_bytes,
+                                file_name=f"{item['font_id']}-{item['layout']}-{item['device'].upper()}.png",
+                                mime="image/png",
+                                use_container_width=True,
+                                key=f"dl-{item['device']}-{item['font_id']}-{item['layout']}",
+                            )
 
         st.divider()
         st.caption("다음 단계: analyze_brief_dummy()를 LLM 호출로 교체 + (선택) 이미지 분석(CLIP) 추가 + fonts.json을 40~50개로 확장")
