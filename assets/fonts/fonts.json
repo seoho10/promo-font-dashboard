@@ -1,0 +1,29 @@
+{
+    "fonts": [
+      {
+        "id": "pretendard",
+        "name": "Pretendard",
+        "path": null,
+        "tags": ["modern", "clean", "high_readability", "ecommerce"],
+        "weights": [400, 600, 700, 800],
+        "license": "OFL/OSS"
+      },
+      {
+        "id": "gmarket_sans",
+        "name": "Gmarket Sans",
+        "path": null,
+        "tags": ["bold", "promo", "energetic", "headline", "high_readability"],
+        "weights": [500, 700, 900],
+        "license": "OSS"
+      },
+      {
+        "id": "noto_serif_kr",
+        "name": "Noto Serif KR",
+        "path": null,
+        "tags": ["classic", "premium", "brand", "serif"],
+        "weights": [400, 600, 700],
+        "license": "OFL/OSS"
+      }
+    ]
+  }
+  
