@@ -18,6 +18,12 @@ FONTS_JSON_PATH = "assets/fonts/fonts.json"
 DEFAULT_CANVAS_WIDTH = 1400
 DEFAULT_CANVAS_HEIGHT = 900
 
+# PC/MO 미리보기 사이즈 (나중에 수정 가능)
+PC_PREVIEW_WIDTH = 1920
+PC_PREVIEW_HEIGHT = 1080
+MO_PREVIEW_WIDTH = 1080
+MO_PREVIEW_HEIGHT = 1920
+
 
 # -----------------------------
 # Data models
@@ -196,13 +202,42 @@ def generate_preview(
     headline: str,
     subcopy: str,
     layout: str,
+    device_type: str = "pc",  # "pc" or "mo"
 ) -> Image.Image:
     """
     Generate a simple banner preview by placing text over the uploaded image.
     layout: "A" (headline top, offer center), "B" (offer big center), "C" (brand mood)
+    device_type: "pc" or "mo" - determines preview dimensions
     """
-    img = base_img.copy()
-    W, H = img.size
+    # Resize base image to target device size
+    if device_type == "pc":
+        target_w, target_h = PC_PREVIEW_WIDTH, PC_PREVIEW_HEIGHT
+    else:  # "mo"
+        target_w, target_h = MO_PREVIEW_WIDTH, MO_PREVIEW_HEIGHT
+    
+    # Resize base image maintaining aspect ratio, then crop/center to target size
+    base_w, base_h = base_img.size
+    base_ratio = base_w / base_h
+    target_ratio = target_w / target_h
+    
+    if base_ratio > target_ratio:
+        # Base is wider, fit to height
+        new_h = target_h
+        new_w = int(base_w * (target_h / base_h))
+    else:
+        # Base is taller, fit to width
+        new_w = target_w
+        new_h = int(base_h * (target_w / base_w))
+    
+    img_resized = base_img.resize((new_w, new_h), Image.Resampling.LANCZOS)
+    
+    # Create target canvas and paste resized image centered
+    img = Image.new("RGBA", (target_w, target_h), (0, 0, 0, 255))
+    paste_x = (target_w - new_w) // 2
+    paste_y = (target_h - new_h) // 2
+    img.paste(img_resized, (paste_x, paste_y))
+    
+    W, H = target_w, target_h
 
     # overlay for contrast
     overlay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
@@ -320,25 +355,56 @@ with right:
             st.subheader("미리보기 시안 (폰트별 3가지 레이아웃)")
             for fm, sc in top:
                 st.markdown(f"**{fm.name}**")
-                prev_cols = st.columns(3)
+                
+                # PC 버전
+                st.markdown("##### PC 버전")
+                prev_cols_pc = st.columns(3)
                 for idx, layout in enumerate(["A", "B", "C"]):
-                    preview = generate_preview(
+                    preview_pc = generate_preview(
                         base_img=base_img,
                         font_meta=fm,
                         headline=headline,
                         subcopy=subcopy,
                         layout=layout,
+                        device_type="pc",
                     )
-                    png_bytes = img_to_bytes_png(preview)
-                    with prev_cols[idx]:
-                        st.image(preview, use_column_width=True)
+                    png_bytes_pc = img_to_bytes_png(preview_pc)
+                    with prev_cols_pc[idx]:
+                        st.image(preview_pc, use_column_width=True)
                         st.download_button(
-                            label=f"다운로드 ({fm.id}-{layout}.png)",
-                            data=png_bytes,
-                            file_name=f"{fm.id}-{layout}.png",
+                            label=f"다운로드 ({fm.id}-{layout}-PC.png)",
+                            data=png_bytes_pc,
+                            file_name=f"{fm.id}-{layout}-PC.png",
                             mime="image/png",
                             use_container_width=True,
+                            key=f"dl-pc-{fm.id}-{layout}",
                         )
+                
+                # MO 버전
+                st.markdown("##### MO 버전")
+                prev_cols_mo = st.columns(3)
+                for idx, layout in enumerate(["A", "B", "C"]):
+                    preview_mo = generate_preview(
+                        base_img=base_img,
+                        font_meta=fm,
+                        headline=headline,
+                        subcopy=subcopy,
+                        layout=layout,
+                        device_type="mo",
+                    )
+                    png_bytes_mo = img_to_bytes_png(preview_mo)
+                    with prev_cols_mo[idx]:
+                        st.image(preview_mo, use_column_width=True)
+                        st.download_button(
+                            label=f"다운로드 ({fm.id}-{layout}-MO.png)",
+                            data=png_bytes_mo,
+                            file_name=f"{fm.id}-{layout}-MO.png",
+                            mime="image/png",
+                            use_container_width=True,
+                            key=f"dl-mo-{fm.id}-{layout}",
+                        )
+                
+                st.divider()
 
         st.divider()
         st.caption("다음 단계: analyze_brief_dummy()를 LLM 호출로 교체 + (선택) 이미지 분석(CLIP) 추가 + fonts.json을 40~50개로 확장")
